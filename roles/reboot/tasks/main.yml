@@ -1,0 +1,13 @@
+---
+
+- name: Check if reboot is required
+  stat:
+    path: "{{ reboot_required_file }}"
+  register: reboot_set
+  ignore_errors: yes
+
+- name: Execute reboot (if required)
+  reboot:
+    pre_reboot_delay: 2
+    reboot_timeout: "{{ reboot_timeout }}"
+  when: reboot_set.stat.exists | bool

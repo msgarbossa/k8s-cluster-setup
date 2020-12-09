@@ -1,0 +1,28 @@
+---
+
+all:
+  vars:
+    k8s_version: 1.19.2
+
+adminhost:
+  hosts:
+    k8s-admin:
+
+k8smaster:
+  hosts:
+    k8s-master-1:
+  vars:
+    pod_network_cidr: 10.10.9.0/24
+    control_plane_endpoint: k8s-master.example.net
+
+k8sworkers:
+  hosts:
+    k8s-worker-1:
+    k8s-worker-2:
+    k8s-worker-3:
+
+k8snodes:
+  children:
+    k8smaster:
+    k8sworkers:
+

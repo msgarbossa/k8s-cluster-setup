@@ -1,0 +1,21 @@
+---
+
+- hosts: k8sworkers
+  become: yes
+  tasks:
+
+  # This was already installed
+  - name: Install open-iscsi package
+    apt:
+      name: open-iscsi
+      state: latest
+
+  # Make sure /etc/iscsi/initiatorname.iscsi is not cloned (make it unique)
+  - name: Ensure iscsid is enabled and started
+    systemd:
+      name: iscsid
+      state: started
+      enabled: yes
+
+  # helm repo add openebs https://openebs.github.io/charts
+  # kubectl create namespace kube-storage

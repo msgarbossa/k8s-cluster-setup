@@ -1,2 +1,4 @@
 __pycache__
 envs.local
+roles/*
+!roles/requirements.yml

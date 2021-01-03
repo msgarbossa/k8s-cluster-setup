@@ -1,0 +1,92 @@
+---
+
+- name: Basic configurations for all nodes
+  hosts: all
+  gather_facts: true
+  become: true
+
+  tasks:
+
+  - name: Set hostname according to Ansible inventory
+    hostname:
+      name: "{{ inventory_hostname }}"
+
+  - name: Disable IPv6 on boot
+    lineinfile:
+      path: /etc/default/grub
+      regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+      line: GRUB_CMDLINE_LINUX_DEFAULT="ipv6.disable=1"
+    notify:
+      - update-grub
+
+  - name: Install basic packages
+    apt:
+      name:
+        - ca-certificates
+        - apt-transport-https
+        - curl
+        - gnupg-agent
+        - software-properties-common
+      state: latest
+
+  - name: Install basic packages
+    apt:
+      name:
+        - vim
+        - git
+        - curl
+        - wget
+      state: latest
+
+  - name: Force running of all notified handlers now (grub)
+    meta: flush_handlers
+
+  - name: Test to see if app_vg exists
+    command: vgs app_vg
+    ignore_errors: yes
+    failed_when: false
+    register: vg_exist
+    changed_when: false
+
+  - name: Create vg if it does not exist
+    block:
+      - name: get unused disk 
+        shell: |
+          set -o pipefail
+          # loop through all block devices starting with sd, >=10GB, with type=disk
+          for i in `lsblk -bnd -o NAME,SIZE,TYPE | awk '($1 ~ /^sd/) && ($2 >= 10000000000) && ($3 == "'disk'") {print $1}'`; do
+            # check if disk is in use based on return code (rc=2 when disk is not formatted)
+            blkid /dev/$i >/dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+              # print disk (captured in stdout later to be used to create vg on pv)
+              echo "/dev/$i"
+              # clean exit to avoid task failure
+              exit 0
+            fi
+          done
+          # this will trigger a failure when a disk is not found
+          echo "unused /dev/sd* disk not found"
+          exit 1
+        args:
+          executable: /bin/bash
+        changed_when: false
+        register: shell_result
+
+      - name: Create app_vg volume group
+        lvg:
+          vg: app_vg
+          pvs: "{{ shell_result.stdout }}"
+          pesize: 64M
+    when: vg_exist.rc != 0
+
+  - name: Include auto-patching role
+    include_role:
+      name: auto_patch
+
+  handlers:
+
+    - name: update-grub
+      shell: |
+        update-grub
+        touch /var/run/reboot-required
+

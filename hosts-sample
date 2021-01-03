@@ -2,9 +2,9 @@
 
 all:
   vars:
-    k8s_version: 1.19.2
+    k8s_version: 1.20.1
 
-adminhost:
+k8sadmin:
   hosts:
     k8s-admin:
 

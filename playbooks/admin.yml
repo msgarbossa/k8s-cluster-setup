@@ -1,0 +1,43 @@
+---
+
+- name: Get config from k8s master node
+  hosts: k8smaster
+  gather_facts: true
+  become: true
+
+  tasks:
+  - name: Fetch /etc/kubernetes/admin.conf
+    fetch:
+      src: /etc/kubernetes/admin.conf
+      dest: ./admin.conf
+      flat: yes
+      # dest: "{{ playbook_dir }}/admin.conf"
+
+- name: Configure admin node
+  hosts: k8sadmin
+  gather_facts: false
+  become: true
+
+  tasks:
+
+  - name: Get kubectl
+    get_url:
+      url: https://storage.googleapis.com/kubernetes-release/release/v{{ k8s_version }}/bin/linux/amd64/kubectl
+      dest: /usr/local/bin/kubectl
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Create ~/.kube directory
+    file:
+      path: ~/.kube
+      state: directory
+      mode: '0750'
+
+  - name: copy kubectl config
+    copy:
+      src: ./admin.conf
+      dest: ~/.kube/config
+      owner: root
+      group: root
+      mode: 0600

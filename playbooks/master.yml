@@ -7,17 +7,17 @@
 
   tasks:
 
-  - name: Check Docker images
-    command: docker images
-    register: docker_image_list
-    changed_when: false
+  # - name: Check Docker images
+  #   command: docker images
+  #   register: docker_image_list
+  #   changed_when: false
 
   # Only run if kube-apiserver not found in "docker images"
   # TODO: add condition to compare version (could simply include a grep in above command)
-  - name: Pull images if required
-    shell: |
-      kubeadm config images pull
-    when: docker_image_list.stdout.find('kube-apiserver') == -1
+  # - name: Pull images if required
+  #   shell: |
+  #     kubeadm config images pull
+  #   when: docker_image_list.stdout.find('kube-apiserver') == -1
 
   - name: Check if cluster is created by looking for token
     command: kubeadm token list
@@ -35,15 +35,15 @@
       CONTROL_PLANE_ENDPOINT: "{{ control_plane_endpoint }}"
       IPv4: "{{ ansible_default_ipv4['address'] }}"
     shell: |
+      cd $HOME
       kubeadm init \
         --pod-network-cidr=${POD_NETWORK_CIDR} \
         --control-plane-endpoint=${CONTROL_PLANE_ENDPOINT} \
         --apiserver-advertise-address=${IPv4} >> cluster_initialized.txt
-      args:
-        chdir: $HOME
-        creates: cluster_initialized.txt
-    # when:
-    #   - token_list.failed == true
+    args:
+      creates: cluster_initialized.txt
+    when:
+      - token_list.failed == true
 
   - name: Ensure kubelet service is enabled and started
     systemd:
@@ -51,22 +51,3 @@
       state: started
       enabled: yes
 
-  - name: Create ~/.kube directory on localhost
-    vars:
-      ansible_become: false
-    file:
-      path: ~/.kube
-      state: directory
-      mode: '0750'
-    delegate_to: localhost
-
-  - name: Fetch /etc/kubernetes/admin.conf
-    vars:
-      local_user_home: "{{ lookup('env', 'HOME') }}"
-      local_user_name: "{{ lookup('env', 'USER') }}"
-    copy:
-      src: /etc/kubernetes/admin.conf
-      dest: "{{ local_user_home}}/.kube/config"
-      owner: "{{ local_user_name }}"
-      mode: '0600'
-      remote_src: yes

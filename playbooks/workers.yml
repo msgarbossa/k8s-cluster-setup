@@ -17,7 +17,10 @@
   become: yes
   tasks:
     - name: join cluster
-      shell: "{{ hostvars['k8s-1.home.arpa'].join_command }} >> node_joined.txt"
+      environment:
+        JOIN_CMD: "{{ hostvars[groups['k8smaster'][0]].join_command }}"
+      shell: |
+        cd $HOME
+        $JOIN_CMD >> node_joined.txt
       args:
-        chdir: $HOME
         creates: node_joined.txt

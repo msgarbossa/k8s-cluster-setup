@@ -1,0 +1,17 @@
+
+- name: Wait for validation results (/var/log/auto-patch/current/report.json)
+  wait_for:
+    path: /var/log/auto-patch/current/report.json
+    state: present
+    delay: 0
+    timeout: 10
+
+- name: Read report.json into Ansible variable
+  slurp:
+    src: /var/log/auto-patch/current/report.json
+  register: report_json_text
+
+- name: Check report.json exit value
+  fail:
+    msg: "/var/log/auto-patch/current/report.json failed: {{ report_json_text.content | b64decode }}"
+  when: (report_json_text.content | b64decode | from_json)['exit'] != 0

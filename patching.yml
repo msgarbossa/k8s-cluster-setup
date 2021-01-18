@@ -1,0 +1,23 @@
+---
+
+- name: Force OS patching using auto-patch script
+  hosts: all
+  gather_facts: false
+  become: true
+
+  tasks:
+
+  - name: Run auto-patch script
+    command: /etc/auto-patch/auto-patch.sh
+    changed_when: True
+    
+  - name: Execute reboot
+    reboot:
+      pre_reboot_delay: 2
+      reboot_timeout: "{{ reboot_timeout }}"
+    when:
+      - ansible_virtualization_type != "docker"
+      - auto_patch_reboot != "enable"
+
+  - name: include tasks for validation
+    include_tasks: ./tasks/patching-validation.yml

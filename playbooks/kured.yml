@@ -1,0 +1,13 @@
+---
+
+- hosts: localhost
+  become: no
+  gather_facts: false
+  tasks:
+
+  - name: Install kured
+    shell: |
+      latest=$(curl -s https://api.github.com/repos/weaveworks/kured/releases | jq -r .[0].tag_name)
+      kubectl --kubeconfig=admin.conf apply -f "https://github.com/weaveworks/kured/releases/download/$latest/kured-$latest-dockerhub.yaml"
+    args:
+      executable: /bin/bash

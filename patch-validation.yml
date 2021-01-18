@@ -1,0 +1,11 @@
+---
+
+- name: Force OS patching using auto-patch script
+  hosts: all
+  gather_facts: false
+  become: true
+
+  tasks:
+
+  - name: include tasks for validation
+    include_tasks: ./tasks/patching-validation.yml

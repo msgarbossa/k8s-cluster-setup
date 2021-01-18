@@ -1,0 +1,13 @@
+---
+
+- name: Setup auto-patching
+  hosts: all
+  gather_facts: false
+  become: true
+
+  tasks:
+
+  - name: Include auto-patching role
+    include_role:
+      name: auto_patch
+

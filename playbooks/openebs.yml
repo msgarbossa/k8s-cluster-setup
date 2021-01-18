@@ -1,6 +1,9 @@
 ---
 
-- hosts: k8sworkers
+# Master gets less storage (set in Ansible inventory) because storage pool is on worker nodes
+# The master node still has few files in /var/openebs (~1MB)
+- name: Setup openebs block storage on nodes
+  hosts: k8snodes
   become: yes
   tasks:
 
@@ -17,5 +20,80 @@
       state: started
       enabled: yes
 
-  # helm repo add openebs https://openebs.github.io/charts
-  # kubectl create namespace kube-storage
+  - name: Setup storage if specified
+    block:
+      - name: Create openebs_lv LV
+        lvol:
+          vg: "{{ data_vg_name }}"
+          lv: openebs_lv
+          size: "{{ openebs_node_gb }}"
+
+      - name: Create filesystem on openebs_lv
+        filesystem:
+          fstype: xfs
+          dev: /dev/{{ data_vg_name }}/openebs_lv
+
+      - name: Mount /var/openebs
+        mount:
+          name: /var/openebs
+          src: /dev/mapper/{{ data_vg_name }}-openebs_lv
+          fstype: xfs
+          opts: nofail
+          state: mounted
+    when:
+      - data_vg_name | bool
+      - openebs_node_gb | bool
+
+- hosts: k8sadmin
+  become: yes
+  gather_facts: false
+  tasks:
+
+  - name: Check if openebs namespace exists
+    command: kubectl get ns --field-selector='metadata.name=openebs'
+    register: openebs_ns_check
+    ignore_errors: yes
+    changed_when: False
+  
+  - name: Create namespace
+    command: kubectl create ns openebs
+    when: openebs_ns_check.stdout_lines == []
+
+  # It doesn't seem like helm repo list does anything with -n openebs (seems to show all namespaces)
+  - name: Check if helm chart exists for openebs
+    command: helm repo list -n openebs
+    register: openebs_helm_repo_check
+    ignore_errors: yes
+    changed_when: False
+  
+  - name: Add helm chart for openebs
+    shell: |
+      helm repo add openebs https://openebs.github.io/charts
+      helm repo update
+    args:
+      executable: /bin/bash
+    when: openebs_helm_repo_check.stdout.find('openebs') == -1
+
+  - name: Check if helm chart is installed
+    command: helm ls -n openebs
+    register: openebs_helm_install_check
+    ignore_errors: yes
+    changed_when: False
+
+  - name: Install if helm chart is not installed
+    block:
+      # override.yaml disable analytics, which breaks because connectivity to Google analytics is blocked
+      - name: Copy override yaml file
+        copy:
+          src: ../files/openebs/override.yaml
+          dest: ./overrides.yaml
+
+      - name: Install if helm chart is not installed
+        shell: |
+          # Use custom values.yaml instead of defaults in case these need to be modified later
+          helm show values openebs/openebs > values.yaml
+          helm install --namespace openebs openebs/openebs --generate-name -f values.yaml -f override.yaml
+        args:
+          executable: /bin/bash
+        register: openebs_helm_install_check
+    when: openebs_helm_install_check.stdout.find('openebs') == -1
